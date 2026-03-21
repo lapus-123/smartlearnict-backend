@@ -204,6 +204,7 @@ exports.login = async (req, res) => {
         ...(matchedUser.role === "instructor" && {
           instructorId: matchedUser.instructorId,
         }),
+        avatarUrl: matchedUser.avatarUrl || null,
       },
     });
   } catch (err) {

@@ -24,6 +24,9 @@ app.use("/api/progress", require("./routes/progress"));
 app.get("/", (req, res) =>
   res.json({ message: "SmartLearningICT API is running." }),
 );
+app.get("/ping", (req, res) =>
+  res.json({ status: "ok", timestamp: new Date().toISOString() }),
+);
 
 // Global error handler — catches multer + cloudinary errors
 app.use((err, req, res, next) => {
