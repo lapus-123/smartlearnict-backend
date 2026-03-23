@@ -223,30 +223,26 @@ exports.forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
 
-    // Always return success to prevent email enumeration
-    if (!user) {
-      return res.json({
-        message:
-          "If that email is registered, your credentials have been sent.",
-      });
-    }
-
-    // Retrieve plain password (it's the studentId or instructorId)
-    const plainPassword = user.studentId || user.instructorId;
-
-    await sendPasswordEmail({
-      to: user.email,
-      username: user.username,
-      password: plainPassword,
-    });
-
-    return res.json({
+    // Respond immediately — don't make user wait for email to send
+    res.json({
       message: "If that email is registered, your credentials have been sent.",
     });
+
+    // Send email in background after response
+    if (user) {
+      const plainPassword = user.studentId || user.instructorId;
+      sendPasswordEmail({
+        to: user.email,
+        username: user.username,
+        password: plainPassword,
+      }).catch((err) => console.error("Email send error:", err.message));
+    }
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Failed to send email. Please try again later." });
+    if (!res.headersSent) {
+      return res
+        .status(500)
+        .json({ message: "Failed to process request. Please try again." });
+    }
   }
 };
