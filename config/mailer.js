@@ -15,7 +15,7 @@ exports.sendPasswordEmail = async ({ to, username, password }) => {
 
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: "SmartLearningICT <onboarding@resend.dev>",
     to,
     subject: "SmartLearningICT Account Password",
@@ -34,4 +34,10 @@ If you did not request this email, please ignore it.
 
 — SmartLearningICT Team`,
   });
+
+  if (error) {
+    console.error("❌ Resend error:", JSON.stringify(error));
+    throw new Error(error.message || "Failed to send email via Resend");
+  }
+  console.log("✅ Email sent successfully to:", to, "| ID:", data?.id);
 };
