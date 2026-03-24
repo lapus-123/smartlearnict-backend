@@ -1,7 +1,5 @@
 const { Resend } = require("resend");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 if (!process.env.RESEND_API_KEY) {
   console.warn(
     "⚠️  RESEND_API_KEY not set — forgot password emails will fail.",
@@ -14,6 +12,8 @@ exports.sendPasswordEmail = async ({ to, username, password }) => {
   if (!process.env.RESEND_API_KEY) {
     throw new Error("Email service is not configured on the server.");
   }
+
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   await resend.emails.send({
     from: "SmartLearningICT <onboarding@resend.dev>",
