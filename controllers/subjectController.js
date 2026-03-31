@@ -1,4 +1,6 @@
 const Subject = require("../models/Subject");
+const Material = require("../models/Material");
+const cloudinary = require("../config/cloudinary");
 
 exports.getSubjects = async (req, res) => {
   try {
@@ -53,6 +55,39 @@ exports.updateSubject = async (req, res) => {
     if (!subject)
       return res.status(404).json({ message: "Subject not found." });
     return res.json({ message: "Subject updated.", subject });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Server error." });
+  }
+};
+
+exports.deleteSubject = async (req, res) => {
+  try {
+    const subject = await Subject.findById(req.params.id);
+    if (!subject)
+      return res.status(404).json({ message: "Subject not found." });
+
+    // Delete all materials under this subject (including Cloudinary files)
+    const materials = await Material.find({ subjectId: req.params.id });
+    for (const mat of materials) {
+      const allFiles = mat.files?.length
+        ? mat.files
+        : [{ publicId: mat.publicId, fileType: mat.fileType }];
+      for (const f of allFiles) {
+        if (f.publicId) {
+          const isVideo = ["mp4", "mov", "webm"].includes(f.fileType);
+          await cloudinary.uploader
+            .destroy(f.publicId, { resource_type: isVideo ? "video" : "raw" })
+            .catch(() => {});
+        }
+      }
+      await Material.findByIdAndDelete(mat._id);
+    }
+
+    await Subject.findByIdAndDelete(req.params.id);
+    return res.json({
+      message: `"${subject.name}" and ${materials.length} material(s) deleted successfully.`,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Server error." });
