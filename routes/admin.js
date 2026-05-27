@@ -60,6 +60,60 @@ router.delete(
   },
 );
 
+// ── STUDENT APPROVAL ROUTES ───────────────────────────────────────────────────
+// GET /api/admin/student-requests
+router.get(
+  "/student-requests",
+  protect,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const students = await User.find({ role: "student", status: "pending" })
+        .populate("collegeId", "name")
+        .populate("courseId", "name")
+        .sort({ createdAt: -1 });
+      return res.json({ students });
+    } catch (err) {
+      return res.status(500).json({ message: "Server error." });
+    }
+  },
+);
+
+// PUT /api/admin/student-requests/:id/approve
+router.put(
+  "/student-requests/:id/approve",
+  protect,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        { status: "active" },
+        { returnDocument: "after" },
+      );
+      if (!user) return res.status(404).json({ message: "User not found." });
+      return res.json({ message: "Student approved.", user });
+    } catch (err) {
+      return res.status(500).json({ message: "Server error." });
+    }
+  },
+);
+
+// DELETE /api/admin/student-requests/:id/reject
+router.delete(
+  "/student-requests/:id/reject",
+  protect,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      await User.findByIdAndDelete(req.params.id);
+      return res.json({ message: "Student registration rejected." });
+    } catch (err) {
+      return res.status(500).json({ message: "Server error." });
+    }
+  },
+);
+
 module.exports = router;
 
 // GET /api/admin/instructors?collegeId=

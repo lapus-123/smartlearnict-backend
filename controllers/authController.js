@@ -44,21 +44,16 @@ exports.register = async (req, res) => {
     let idField, idValue;
 
     if (role === "student") {
-      const { studentId, courseId, section } = req.body;
-      if (!studentId || !courseId || !section)
-        return res
-          .status(400)
-          .json({
-            message:
-              "studentId, courseId, and section are required for students.",
-          });
+      const { studentId, courseId } = req.body;
+      if (!studentId || !courseId)
+        return res.status(400).json({
+          message: "studentId and courseId are required for students.",
+        });
       const existing = await User.findOne({ studentId });
       if (existing)
-        return res
-          .status(409)
-          .json({
-            message: `Student ID "${studentId}" is already registered.`,
-          });
+        return res.status(409).json({
+          message: `Student ID "${studentId}" is already registered.`,
+        });
       idField = "studentId";
       idValue = studentId;
     } else {
@@ -69,11 +64,9 @@ exports.register = async (req, res) => {
           .json({ message: "instructorId is required for instructors." });
       const existing = await User.findOne({ instructorId });
       if (existing)
-        return res
-          .status(409)
-          .json({
-            message: `Instructor ID "${instructorId}" is already registered.`,
-          });
+        return res.status(409).json({
+          message: `Instructor ID "${instructorId}" is already registered.`,
+        });
       idField = "instructorId";
       idValue = instructorId;
     }
@@ -96,20 +89,17 @@ exports.register = async (req, res) => {
       collegeId,
       schoolYear,
       email: email.toLowerCase().trim(),
-      status: role === "instructor" ? "pending" : "active",
+      status: "pending", // both student and instructor require admin approval
       [idField]: idValue,
     };
     if (role === "student") {
       userData.courseId = req.body.courseId;
-      userData.section = req.body.section;
     }
 
     await User.create(userData);
 
     const pendingMsg =
-      role === "instructor"
-        ? " Your account is pending Admin approval before you can log in."
-        : "";
+      " Your account is pending Admin approval before you can log in.";
     return res.status(201).json({
       message: "Registration Successful" + pendingMsg,
       username,
@@ -171,12 +161,10 @@ exports.login = async (req, res) => {
 
     // Block instructors who haven't been approved yet
     if (matchedUser.status === "pending") {
-      return res
-        .status(403)
-        .json({
-          message:
-            "Your account is pending Admin approval. Please wait for your account to be activated.",
-        });
+      return res.status(403).json({
+        message:
+          "Your account is pending Admin approval. Please wait for your account to be activated.",
+      });
     }
 
     const token = signToken({
