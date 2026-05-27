@@ -24,6 +24,7 @@ const materialSchema = new mongoose.Schema(
     fileUrl: { type: String, required: true },
     publicId: { type: String },
     fileType: { type: String, required: true },
+    fileName: { type: String },
     // Multi-file support — all files including the first one
     files: { type: [fileEntrySchema], default: [] },
     uploadedBy: {

@@ -1,6 +1,13 @@
 const Material = require("../models/Material");
 const cloudinary = require("../config/cloudinary");
 
+const getCloudinaryResourceType = (fileType = "") => {
+  const ext = fileType.toLowerCase();
+  if (["mp4", "mov", "webm"].includes(ext)) return "video";
+  if (["jpg", "jpeg", "png"].includes(ext)) return "image";
+  return "raw";
+};
+
 exports.getRecentMaterials = async (req, res) => {
   try {
     const materials = await Material.find()
@@ -88,6 +95,7 @@ exports.uploadMaterial = async (req, res) => {
       fileUrl: first.fileUrl,
       publicId: first.publicId,
       fileType: first.fileType,
+      fileName: first.fileName,
       files: filesArr,
       uploadedBy,
       uploadedByName,
@@ -123,9 +131,10 @@ exports.deleteMaterial = async (req, res) => {
       : [{ publicId: material.publicId, fileType: material.fileType }];
     for (const f of allFiles) {
       if (f.publicId) {
-        const isVideo = ["mp4", "mov", "webm"].includes(f.fileType);
         await cloudinary.uploader
-          .destroy(f.publicId, { resource_type: isVideo ? "video" : "raw" })
+          .destroy(f.publicId, {
+            resource_type: getCloudinaryResourceType(f.fileType),
+          })
           .catch(() => {});
       }
     }
