@@ -13,8 +13,11 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       unique: true,
     },
-    // 'pending' = awaiting admin approval (instructors only), 'active' = can log in
-    status: { type: String, enum: ["pending", "active"], default: "active" },
+    status: {
+      type: String,
+      enum: ["pending", "active", "inactive", "suspended"],
+      default: "active",
+    },
 
     studentId: { type: String, trim: true, unique: true, sparse: true },
     courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Section" },

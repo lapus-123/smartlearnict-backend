@@ -7,10 +7,14 @@ const { sendPasswordEmail } = require("../config/mailer");
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const generateUsername = (birthday) => {
-  const parts = birthday.split("/");
+  const parts = String(birthday || "").split("/");
   if (parts.length < 2)
     throw new Error("Invalid birthday format. Use MM/DD/YYYY.");
-  return parts[0] + parts[1];
+  const month = String(Number(parts[0])).padStart(2, "0");
+  const day = String(Number(parts[1])).padStart(2, "0");
+  if (month === "NaN" || day === "NaN")
+    throw new Error("Invalid birthday format. Use MM/DD/YYYY.");
+  return month + day;
 };
 
 const signToken = (payload) =>
@@ -19,7 +23,11 @@ const signToken = (payload) =>
 // ── REGISTER ──────────────────────────────────────────────────────────────────
 exports.register = async (req, res) => {
   try {
-    const { role, fullName, birthday, collegeId, schoolYear, email } = req.body;
+    const { role, collegeId } = req.body;
+    const fullName = req.body.fullName?.trim();
+    const birthday = req.body.birthday?.trim();
+    const schoolYear = req.body.schoolYear?.trim();
+    const email = req.body.email?.toLowerCase().trim();
 
     if (!["student", "instructor"].includes(role))
       return res
@@ -33,9 +41,7 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Invalid email address format." });
 
     // Check email uniqueness
-    const emailExists = await User.findOne({
-      email: email.toLowerCase().trim(),
-    });
+    const emailExists = await User.findOne({ email });
     if (emailExists)
       return res
         .status(409)
@@ -44,7 +50,8 @@ exports.register = async (req, res) => {
     let idField, idValue;
 
     if (role === "student") {
-      const { studentId, courseId } = req.body;
+      const { courseId } = req.body;
+      const studentId = req.body.studentId?.trim();
       if (!studentId || !courseId)
         return res.status(400).json({
           message: "studentId and courseId are required for students.",
@@ -57,7 +64,7 @@ exports.register = async (req, res) => {
       idField = "studentId";
       idValue = studentId;
     } else {
-      const { instructorId } = req.body;
+      const instructorId = req.body.instructorId?.trim();
       if (!instructorId)
         return res
           .status(400)
@@ -88,7 +95,7 @@ exports.register = async (req, res) => {
       birthday,
       collegeId,
       schoolYear,
-      email: email.toLowerCase().trim(),
+      email,
       status: "pending", // both student and instructor require admin approval
       [idField]: idValue,
     };
@@ -103,7 +110,7 @@ exports.register = async (req, res) => {
     return res.status(201).json({
       message: "Registration Successful" + pendingMsg,
       username,
-      pending: role === "instructor",
+      pending: true,
       hint: `Your username is ${username} and your password is your ${idField}.`,
     });
   } catch (err) {
@@ -115,7 +122,8 @@ exports.register = async (req, res) => {
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 exports.login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const username = req.body.username?.trim();
+    const password = req.body.password?.trim();
     if (!username || !password)
       return res
         .status(400)
@@ -166,6 +174,16 @@ exports.login = async (req, res) => {
           "Your account is pending Admin approval. Please wait for your account to be activated.",
       });
     }
+    if (matchedUser.status === "inactive") {
+      return res.status(403).json({
+        message: "Your account is inactive. Please contact the administrator.",
+      });
+    }
+    if (matchedUser.status === "suspended") {
+      return res.status(403).json({
+        message: "Your account is suspended. Please contact the administrator.",
+      });
+    }
 
     const token = signToken({
       id: matchedUser._id,
@@ -212,25 +230,37 @@ exports.forgotPassword = async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase().trim() });
 
     // Respond immediately — don't make user wait for email to send
-    res.json({
-      message: "If that email is registered, your credentials have been sent.",
-    });
+    if (!user) {
+      return res.json({
+        message:
+          "If that email is registered, your account recovery email will be sent.",
+      });
+    }
 
     // Send email in background after response
-    if (user) {
-      const plainPassword = user.studentId || user.instructorId;
-      sendPasswordEmail({
-        to: user.email,
-        username: user.username,
-        password: plainPassword,
-      }).catch((err) => console.error("Email send error:", err.message));
+    const plainPassword = user.studentId || user.instructorId;
+    if (!plainPassword) {
+      return res.status(400).json({
+        message:
+          "This account does not have a recovery ID on file. Please contact the administrator.",
+      });
     }
+
+    await sendPasswordEmail({
+      to: user.email,
+      username: user.username,
+      password: plainPassword,
+    });
+
+    return res.json({
+      message: "If that email is registered, your credentials have been sent.",
+    });
   } catch (err) {
-    console.error(err);
-    if (!res.headersSent) {
-      return res
-        .status(500)
-        .json({ message: "Failed to process request. Please try again." });
-    }
+    console.error("Forgot password error:", err.message);
+    return res.status(500).json({
+      message:
+        err.message ||
+        "Failed to send the recovery email. Please try again later.",
+    });
   }
 };

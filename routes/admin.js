@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { protect, requireRole } = require("../middleware/auth");
 const User = require("../models/User");
+const { deleteUser, editUser, getUsers } = require("../controllers/adminController");
 
 // GET /api/admin/instructor-requests — pending instructors
 router.get(
@@ -33,7 +34,7 @@ router.put(
       const user = await User.findByIdAndUpdate(
         req.params.id,
         { status: "active" },
-        { returnDocument: "after" },
+        { new: true, runValidators: true },
       ).populate("collegeId", "name");
       if (!user) return res.status(404).json({ message: "User not found." });
       return res.json({ message: "Instructor approved.", user });
@@ -89,8 +90,10 @@ router.put(
       const user = await User.findByIdAndUpdate(
         req.params.id,
         { status: "active" },
-        { returnDocument: "after" },
-      );
+        { new: true, runValidators: true },
+      )
+        .populate("collegeId", "name")
+        .populate("courseId", "name");
       if (!user) return res.status(404).json({ message: "User not found." });
       return res.json({ message: "Student approved.", user });
     } catch (err) {
@@ -113,8 +116,6 @@ router.delete(
     }
   },
 );
-
-module.exports = router;
 
 // GET /api/admin/instructors?collegeId=
 router.get("/instructors", protect, requireRole("admin"), async (req, res) => {
@@ -151,14 +152,13 @@ router.get("/students", protect, requireRole("admin"), async (req, res) => {
   }
 });
 
+// GET /api/admin/users
+router.get("/users", protect, requireRole("admin"), getUsers);
+
+// PUT /api/admin/users/:id
+router.put("/users/:id", protect, requireRole("admin"), editUser);
+
 // DELETE /api/admin/users/:id
-router.delete("/users/:id", protect, requireRole("admin"), async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: "User not found." });
-    await User.findByIdAndDelete(req.params.id);
-    return res.json({ message: `${user.fullName} has been deleted.` });
-  } catch (err) {
-    return res.status(500).json({ message: "Server error." });
-  }
-});
+router.delete("/users/:id", protect, requireRole("admin"), deleteUser);
+
+module.exports = router;
